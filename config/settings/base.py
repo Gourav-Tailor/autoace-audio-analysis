@@ -58,7 +58,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
-    "default": env.db("DATABASE_URL", default="postgres://autoace:postgres@localhost:5432/autoace_db")
+    "default": env.db(
+        "DATABASE_URL", default="postgres://autoace:postgres@localhost:5432/autoace_db"
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [
