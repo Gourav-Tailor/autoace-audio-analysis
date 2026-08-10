@@ -148,6 +148,9 @@ class AcousticAnalyzer(AudioAnalyzer):
         peak = max(abs(value) for value in samples)
         energy_variance = self._energy_variance(samples)
         low_band_ratio = self._low_band_energy_ratio(samples)
+        longest_silence_seconds = self._estimate_long_silence_seconds(
+            samples, sample_rate
+        )
 
         return {
             "duration": duration,
@@ -158,6 +161,7 @@ class AcousticAnalyzer(AudioAnalyzer):
             "peak": peak,
             "energy_variance": energy_variance,
             "low_band_ratio": low_band_ratio,
+            "longest_silence_seconds": longest_silence_seconds,
         }
 
     def _normalize_8bit(self, samples):
@@ -202,6 +206,38 @@ class AcousticAnalyzer(AudioAnalyzer):
         if not windows:
             return 0.0
         return sum(windows) / len(windows)
+
+    def _estimate_long_silence_seconds(self, samples, sample_rate):
+        """Estimate a VAD-like pause using 20 ms windows.
+
+        A long silence is a contiguous run of very low-energy frames longer than
+        one second. This is intentionally conservative for a baseline feature
+        detector and serves as a measurable threshold for task 13.
+        """
+        if not samples or sample_rate <= 0:
+            return 0.0
+
+        threshold = max(0.015, 0.05 * max(abs(value) for value in samples))
+        frame_size = max(1, int(sample_rate * 0.020))
+        longest_run = 0.0
+        current_run = 0.0
+
+        for start in range(0, len(samples), frame_size):
+            block = samples[start : start + frame_size]
+            if not block:
+                continue
+            energy = sum(abs(value) for value in block) / len(block)
+            if energy < threshold:
+                current_run += len(block) / sample_rate
+            else:
+                if current_run > longest_run:
+                    longest_run = current_run
+                current_run = 0.0
+
+        if current_run > longest_run:
+            longest_run = current_run
+
+        return longest_run
 
     def _emotion_detectors(self, features):
         """Map broad acoustic layout to task 9 tone and intensity labels."""
@@ -278,22 +314,40 @@ class AcousticAnalyzer(AudioAnalyzer):
         return "clear"
 
     def _overlap_detector(self, features):
-        """A conservative overlap hint in a single-channel baseline.
+        """Detect overlap using a VAD-like, single-channel acoustic proxy.
 
-        Speaker overlap is not directly recoverable from a single-stream waveform
-        without multi-channel sources, so the baseline reports overlap only when
-        the signal exhibits high-energy contention that looks like a multi-speaker
-        blend and the frame variance is not calm.
+        The assignment explicitly allows VAD plus segmentation/diarization, but a
+        dependency-free baseline can only approximate this on a monophonic waveform.
+        The conservative signal is: high RMS energy plus high variance or crossing
+        activity, both of which are consistent with multiple speakers speaking over
+        one another rather than a calm monologue.
         """
         rms = features.get("rms", 0.0)
         energy_variance = features.get("energy_variance", 0.0)
         zcr = features.get("zcr", 0.0)
-        if rms > 0.36 and (energy_variance > 0.04 or zcr > 0.16):
-            return True
+        silence_ratio = features.get("silence_ratio", 0.0)
+
+        if rms > 0.36 and silence_ratio < 0.60:
+            if energy_variance > 0.04 or zcr > 0.16:
+                return True
         return False
 
     def _silence_detector(self, features):
-        return features.get("silence_ratio", 0.0) > 0.55
+        """Task 13 long-silence detector.
+
+        This baseline implements the backlog's two-level thresholding:
+        * the first branch reports a dead-air ratio to the top-level analyzer
+        * the second branch reports a long pause when the estimated segment length
+          crosses the VAD-style silence threshold.
+        """
+        silence_ratio = features.get("silence_ratio", 0.0)
+        longest_silence_seconds = features.get("longest_silence_seconds", 0.0)
+
+        if silence_ratio > 0.55:
+            return True
+        if longest_silence_seconds >= 1.0:
+            return True
+        return False
 
     def _confidence(self, features):
         """Confidence escalates when the signal is measurable and stable."""

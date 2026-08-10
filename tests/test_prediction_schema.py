@@ -106,5 +106,11 @@ def test_acoustic_analyzer_reads_wave_and_emits_valid_prediction(tmp_path):
         "distressed",
     }
     assert result.emotional_intensity in {"low", "medium", "high"}
-    assert result.audio_quality in {"clear", "noisy", "poor"}
+    assert result.audio_quality in {
+        "clear",
+        "slightly_impaired",
+        "severely_impaired",
+    }
+    assert isinstance(result.speaker_overlap_present, bool)
+    assert isinstance(result.long_silence_present, bool)
     assert 0.0 <= result.confidence <= 1.0
