@@ -75,6 +75,11 @@ class AcousticAnalyzer(AudioAnalyzer):
         silence_present = self._silence_detector(features)
         confidence = self._confidence(features)
 
+        # The assignment requires the no-noise branch to expose an empty string
+        # rather than a synthetic noise label.
+        if not noise_present:
+            noise_type = ""
+
         return PredictionResult(
             emotional_tone=tone,
             emotional_intensity=intensity,
@@ -224,7 +229,12 @@ class AcousticAnalyzer(AudioAnalyzer):
         return tone, intensity
 
     def _noise_detectors(self, features):
-        """Identify obvious noise-like or technical-failure characteristics."""
+        """Identify obvious noise-like or technical-failure characteristics.
+
+        The contract allows one of a small set of types; in the baseline those
+        labels are intentionally coarse and grounded in the same acoustic metrics
+        as the quality edges described in the assignment.
+        """
         silence_ratio = features.get("silence_ratio", 0.0)
         rms = features.get("rms", 0.0)
         zcr = features.get("zcr", 0.0)
@@ -236,15 +246,15 @@ class AcousticAnalyzer(AudioAnalyzer):
 
         if silence_ratio > 0.55 or features.get("duration", 0.0) <= 0.0:
             noise_present = True
-            noise_type = "silence-heavy"
+            noise_type = "silence"
             severity = "medium"
         elif rms < 0.03 and peak < 0.05:
             noise_present = True
-            noise_type = "low-energy signal"
+            noise_type = "low_energy"
             severity = "high"
         elif zcr > 0.18:
             noise_present = True
-            noise_type = "spectral / high-activity noise"
+            noise_type = "spectral_activity"
             severity = "medium"
         elif rms > 0.30:
             noise_present = False
@@ -254,10 +264,17 @@ class AcousticAnalyzer(AudioAnalyzer):
         return noise_present, noise_type, severity
 
     def _quality_detector(self, features, noise_present, noise_severity):
+        """Map impairment to the assignment vocabulary: clear / slightly / severe."""
+        rms = features.get("rms", 0.0)
+        zcr = features.get("zcr", 0.0)
+        silence_ratio = features.get("silence_ratio", 0.0)
+
+        if noise_present and noise_severity == "high":
+            return "severely_impaired"
         if noise_present or noise_severity == "high":
-            return "poor"
-        if noise_severity == "medium":
-            return "noisy"
+            return "slightly_impaired"
+        if silence_ratio > 0.45 or zcr > 0.20 or rms < 0.03:
+            return "slightly_impaired"
         return "clear"
 
     def _overlap_detector(self, features):

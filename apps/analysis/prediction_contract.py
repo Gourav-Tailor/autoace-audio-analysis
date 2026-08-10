@@ -4,7 +4,7 @@ from typing import Literal
 VALID_TONES = {"neutral", "satisfied", "frustrated", "upset", "distressed"}
 VALID_INTENSITIES = {"low", "medium", "high"}
 VALID_SEVERITIES = {"low", "medium", "high"}
-VALID_QUALITIES = {"clear", "noisy", "poor"}
+VALID_QUALITIES = {"clear", "slightly_impaired", "severely_impaired"}
 
 
 @dataclass(frozen=True)
@@ -14,7 +14,7 @@ class PredictionResult:
     background_noise_present: bool
     background_noise_type: str
     background_noise_severity: Literal["low", "medium", "high"]
-    audio_quality: Literal["clear", "noisy", "poor"]
+    audio_quality: Literal["clear", "slightly_impaired", "severely_impaired"]
     speaker_overlap_present: bool
     long_silence_present: bool
     confidence: float
@@ -32,7 +32,10 @@ class PredictionResult:
                 "background_noise_severity must be one of: low, medium, high"
             )
         if self.audio_quality not in VALID_QUALITIES:
-            raise ValueError("audio_quality must be one of: clear, noisy, poor")
+            raise ValueError(
+                "audio_quality must be one of: "
+                "clear, slightly_impaired, severely_impaired"
+            )
         if not 0.0 <= self.confidence <= 1.0:
             raise ValueError("confidence must be a float between 0 and 1")
 

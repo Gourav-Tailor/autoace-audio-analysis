@@ -32,14 +32,32 @@ def test_prediction_result_accepts_valid_payload():
         background_noise_present=True,
         background_noise_type="office chatter",
         background_noise_severity="low",
-        audio_quality="clear",
+        audio_quality="slightly_impaired",
         speaker_overlap_present=False,
         long_silence_present=False,
         confidence=0.82,
     )
 
     assert result.emotional_tone == "frustrated"
+    assert result.audio_quality == "slightly_impaired"
     assert 0.0 <= result.confidence <= 1.0
+
+
+def test_prediction_result_accepts_severely_impaired_quality():
+    result = PredictionResult(
+        emotional_tone="neutral",
+        emotional_intensity="low",
+        background_noise_present=False,
+        background_noise_type="",
+        background_noise_severity="high",
+        audio_quality="severely_impaired",
+        speaker_overlap_present=False,
+        long_silence_present=True,
+        confidence=0.51,
+    )
+
+    assert result.audio_quality == "severely_impaired"
+    assert result.background_noise_type == ""
 
 
 def test_prediction_result_rejects_invalid_tone():

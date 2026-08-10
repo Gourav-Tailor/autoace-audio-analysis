@@ -18,7 +18,9 @@ class PredictionContractSerializer(serializers.Serializer):
             "high",
         ]
     )
-    audio_quality = serializers.ChoiceField(choices=["clear", "noisy", "poor"])
+    audio_quality = serializers.ChoiceField(
+        choices=["clear", "slightly_impaired", "severely_impaired"]
+    )
     speaker_overlap_present = serializers.BooleanField()
     long_silence_present = serializers.BooleanField()
     confidence = serializers.FloatField(min_value=0.0, max_value=1.0)
