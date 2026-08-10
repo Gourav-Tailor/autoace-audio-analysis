@@ -12,7 +12,7 @@ from .serializers import (
     PredictionContractSerializer,
     PredictionSerializer,
 )
-from .upload_handlers import BatchUploadService
+from .upload_handlers import BatchProcessor, BatchUploadService, BatchValidationError
 
 
 class BatchListView(generics.ListCreateAPIView):
@@ -36,46 +36,35 @@ class BatchUploadView(APIView):
         if not upload.name.lower().endswith(".zip"):
             return Response({"error": "Only .zip uploads are accepted"}, status=400)
 
-        service = BatchUploadService(upload)
-        saved_path = service.save()
+        try:
+            service = BatchUploadService(upload)
+            saved_path = service.save()
 
-        batch = Batch.objects.create(
-            name=upload.name,
-            status=Batch.STATUS_VALIDATING,
-            total_files=0,
-            processed_files=0,
-            failed_files=0,
-        )
+            batch = Batch.objects.create(
+                name=upload.name,
+                status=Batch.STATUS_VALIDATING,
+                total_files=0,
+                processed_files=0,
+                failed_files=0,
+            )
 
-        manifest_rows = service.read_manifest()
-        audio_filenames = service.audio_filenames_from_manifest()
-        created_count = 0
+            processor = BatchProcessor(batch, service)
+            result = processor.process()
 
-        for filename in audio_filenames:
-            file_path = service.extract_dir / filename
-            if file_path.exists():
-                AudioFile.objects.create(
-                    batch=batch,
-                    filename=filename,
-                    file_path=str(file_path),
-                    status=AudioFile.STATUS_PENDING,
-                )
-                created_count += 1
-
-        batch.total_files = created_count
-        batch.status = Batch.STATUS_UPLOADED if created_count else Batch.STATUS_FAILED
-        batch.save(update_fields=["total_files", "status"])
-
-        return Response(
-            {
-                "message": "Batch upload stored",
-                "batch_id": batch.id,
-                "stored_path": str(saved_path),
-                "audio_files_created": created_count,
-                "manifest_rows": len(manifest_rows),
-            },
-            status=status.HTTP_201_CREATED,
-        )
+            return Response(
+                {
+                    "message": "Batch upload stored",
+                    "batch_id": batch.id,
+                    "stored_path": str(saved_path),
+                    "audio_files_created": result["audio_files_created"],
+                    "manifest_rows": result["manifest_rows"],
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except BatchValidationError as exc:
+            return Response({"error": str(exc)}, status=400)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=400)
 
 
 @api_view(["GET"])

@@ -40,7 +40,7 @@ def test_batch_upload_parses_manifest_and_creates_audio_rows():
         archive.writestr("call_002.wav", b"audio")
         archive.writestr(
             "labels.csv",
-            "filename,label\ncall_001.wav,neutral\ncall_002.wav,satisfied\n",
+            "name,result_json\ncall_001.wav,{}\ncall_002.wav,{}\n",
         )
 
     archive_buffer.seek(0)
@@ -61,3 +61,27 @@ def test_batch_upload_parses_manifest_and_creates_audio_rows():
     assert batch.audio_files.count() == 2
     assert batch.audio_files.filter(filename="call_001.wav").exists()
     assert batch.audio_files.filter(filename="call_002.wav").exists()
+
+
+def test_batch_upload_rejects_manifest_without_labels():
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w") as archive:
+        archive.writestr("call_001.wav", b"audio")
+        archive.writestr("notes.txt", "not a manifest")
+
+    archive_buffer.seek(0)
+    response = APIClient().post(
+        "/batches/upload/",
+        {
+            "file": SimpleUploadedFile(
+                "broken_batch.zip",
+                archive_buffer.getvalue(),
+                content_type="application/zip",
+            )
+        },
+        format="multipart",
+    )
+
+    assert response.status_code == 400
+    error_text = response.json().get("error", "")
+    assert "labels.csv" in error_text
