@@ -1,4 +1,26 @@
+from pathlib import Path
+
+from apps.analysis.analyzers import AcousticAnalyzer, AudioAnalyzer, BaselineAnalyzer
 from apps.analysis.prediction_contract import PredictionResult
+
+
+def test_audio_analyzer_contract_exists_and_is_abstract():
+    assert issubclass(AudioAnalyzer, object)
+    assert AudioAnalyzer.__abstractmethods__
+
+
+def test_baseline_analyzer_returns_prediction_contract():
+    analyzer = BaselineAnalyzer()
+    result = analyzer.analyze(Path("audio.wav"))
+    assert isinstance(result, PredictionResult)
+    assert result.to_dict()["confidence"] >= 0.0
+
+
+def test_acoustic_analyzer_is_a_concrete_audio_analyzer():
+    analyzer = AcousticAnalyzer()
+    assert isinstance(analyzer, AudioAnalyzer)
+    result = analyzer.analyze(Path("audio.wav"))
+    assert isinstance(result, PredictionResult)
 
 
 def test_prediction_result_accepts_valid_payload():

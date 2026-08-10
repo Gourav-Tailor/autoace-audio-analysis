@@ -12,6 +12,7 @@ from .serializers import (
     PredictionContractSerializer,
     PredictionSerializer,
 )
+from .tasks import enqueue_batch_audio_processing
 from .upload_handlers import BatchProcessor, BatchUploadService, BatchValidationError
 
 
@@ -50,14 +51,16 @@ class BatchUploadView(APIView):
 
             processor = BatchProcessor(batch, service)
             result = processor.process()
+            enqueue_batch_audio_processing(batch.id)
 
             return Response(
                 {
-                    "message": "Batch upload stored",
+                    "message": "Batch upload stored and queued for processing",
                     "batch_id": batch.id,
                     "stored_path": str(saved_path),
                     "audio_files_created": result["audio_files_created"],
                     "manifest_rows": result["manifest_rows"],
+                    "processing_status": batch.status,
                 },
                 status=status.HTTP_201_CREATED,
             )

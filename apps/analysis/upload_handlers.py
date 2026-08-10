@@ -5,7 +5,9 @@ from pathlib import Path
 from uuid import uuid4
 
 from django.conf import settings
+from django.utils import timezone
 
+from .analyzers import BaselineAnalyzer
 from .models import AudioFile, Batch, Prediction
 from .prediction_contract import PredictionResult
 
@@ -69,12 +71,13 @@ class BatchUploadService:
 
 
 class BatchProcessor:
-    def __init__(self, batch, upload_service):
+    def __init__(self, batch, upload_service=None, analyzer=None):
         self.batch = batch
         self.service = upload_service
+        self.analyzer = analyzer or BaselineAnalyzer()
         self.manifest = []
         self.audio_files = []
-        self.extract_dir = self.service.extract_dir
+        self.extract_dir = None if self.service is None else self.service.extract_dir
 
     def process(self):
         validation = self.validate_batch()
@@ -226,9 +229,66 @@ class BatchProcessor:
                 )
 
     def process_audio(self):
+        self.batch.status = Batch.STATUS_PROCESSING
+        self.batch.started_at = timezone.now()
+        self.batch.save(update_fields=["status", "started_at"])
+
+        failed_count = 0
         for audio_file in AudioFile.objects.filter(batch=self.batch):
             audio_file.status = AudioFile.STATUS_PROCESSING
             audio_file.save(update_fields=["status"])
+
+            try:
+                result = self.analyzer.analyze(audio_file.file_path)
+                Prediction.objects.update_or_create(
+                    audio_file=audio_file,
+                    defaults={
+                        "emotional_tone": result.emotional_tone,
+                        "emotional_intensity": result.emotional_intensity,
+                        "background_noise_present": result.background_noise_present,
+                        "background_noise_type": result.background_noise_type,
+                        "background_noise_severity": result.background_noise_severity,
+                        "audio_quality": result.audio_quality,
+                        "speaker_overlap_present": result.speaker_overlap_present,
+                        "long_silence_present": result.long_silence_present,
+                        "confidence": result.confidence,
+                    },
+                )
+                audio_file.status = AudioFile.STATUS_COMPLETED
+                audio_file.processed_at = timezone.now()
+                audio_file.error_message = ""
+                audio_file.save(
+                    update_fields=["status", "processed_at", "error_message"]
+                )
+            except Exception as exc:
+                failed_count += 1
+                audio_file.status = AudioFile.STATUS_FAILED
+                audio_file.error_message = str(exc)[:500]
+                audio_file.save(update_fields=["status", "error_message"])
+
+        processed = AudioFile.objects.filter(
+            batch=self.batch, status=AudioFile.STATUS_COMPLETED
+        ).count()
+        if failed_count:
+            self.batch.status = Batch.STATUS_FAILED
+        else:
+            self.batch.status = Batch.STATUS_COMPLETED
+        self.batch.processed_files = processed
+        self.batch.failed_files = failed_count
+        self.batch.completed_at = timezone.now()
+        self.batch.save(
+            update_fields=[
+                "status",
+                "processed_files",
+                "failed_files",
+                "completed_at",
+            ]
+        )
+        return {
+            "batch_id": self.batch.id,
+            "processed_files": processed,
+            "failed_files": failed_count,
+        }
 
     def update_progress(self, created_count):
         self.batch.total_files = created_count
