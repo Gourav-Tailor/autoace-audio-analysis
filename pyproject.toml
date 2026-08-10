@@ -35,7 +35,7 @@ line-length = 88
 src = ["config", "apps"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "C4"]
+select = ["E", "F", "B", "C4"]
 
 [tool.black]
 line-length = 88
