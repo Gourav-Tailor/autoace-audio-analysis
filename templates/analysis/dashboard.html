@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AutoACE Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #f8fafc; color: #172033; }
+    h1 { margin-bottom: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+    .card { background: white; border-radius: 10px; padding: 1rem; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #d9e2ec; padding: .55rem; text-align: left; }
+    th { background: #eef4f8; }
+  </style>
+</head>
+<body>
+  <h1>AutoACE Audio Analysis Dashboard</h1>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Batches</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Files</th>
+            <th>Processed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for batch in batches %}
+            <tr>
+              <td>{{ batch.name }}</td>
+              <td>{{ batch.status }}</td>
+              <td>{{ batch.total_files }}</td>
+              <td>{{ batch.processed_files }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4">No batches found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Audio Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th>Batch</th>
+            <th>Status</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in audio_files %}
+            <tr>
+              <td>{{ file.filename }}</td>
+              <td>{{ file.batch.name }}</td>
+              <td>{{ file.status }}</td>
+              <td>{{ file.duration|default:'-' }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4">No audio files found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Predictions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Audio</th>
+            <th>Tone</th>
+            <th>Intensity</th>
+            <th>Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prediction in predictions %}
+            <tr>
+              <td>{{ prediction.audio_file.filename }}</td>
+              <td>{{ prediction.emotional_tone }}</td>
+              <td>{{ prediction.emotional_intensity }}</td>
+              <td>{{ prediction.confidence }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4">No predictions found</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+</body>
+</html>
