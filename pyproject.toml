@@ -1,0 +1,53 @@
+[project]
+name = "autoace-audio-analysis"
+version = "0.1.0"
+description = "A fresh Cookiecutter-style Django + DRF + PostgreSQL project scaffold."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Your Team" }]
+dependencies = [
+  "Django>=5.0,<6.0",
+  "djangorestframework>=3.15,<4.0",
+  "psycopg2-binary>=2.9,<3.0",
+  "django-environ>=0.11,<1.0",
+  "gunicorn>=22.0,<24.0",
+  "whitenoise>=6.7,<7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9.0",
+  "pytest-django>=4.8,<5.0",
+  "pytest-cov>=5.0,<7.0",
+  "ruff>=0.6,<1.0",
+  "black>=24.8,<26.0",
+  "factory-boy>=3.3,<4.0",
+  "pre-commit>=3.8,<4.0",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 88
+src = ["config", "apps"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C4"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.django]
+settings_module = "config.settings.dev"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "config*"]
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
