@@ -1,3 +1,5 @@
+import struct
+import wave
 from pathlib import Path
 
 from apps.analysis.analyzers import AcousticAnalyzer, AudioAnalyzer, BaselineAnalyzer
@@ -57,3 +59,34 @@ def test_prediction_result_rejects_invalid_tone():
         assert "emotional_tone" in str(exc)
     else:
         raise AssertionError("Invalid tone should have raised ValueError")
+
+
+def test_acoustic_analyzer_reads_wave_and_emits_valid_prediction(tmp_path):
+    audio_path = tmp_path / "baseline.wav"
+
+    sample_rate = 16000
+    duration_seconds = 0.25
+    frames = int(sample_rate * duration_seconds)
+
+    with wave.open(str(audio_path), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        for i in range(frames):
+            amplitude = 0.25 * (i % 16000) / sample_rate
+            value = int(32767 * max(-1.0, min(1.0, amplitude)))
+            wav.writeframes(struct.pack("<h", value))
+
+    result = AcousticAnalyzer().analyze(audio_path)
+
+    assert isinstance(result, PredictionResult)
+    assert result.emotional_tone in {
+        "neutral",
+        "satisfied",
+        "frustrated",
+        "upset",
+        "distressed",
+    }
+    assert result.emotional_intensity in {"low", "medium", "high"}
+    assert result.audio_quality in {"clear", "noisy", "poor"}
+    assert 0.0 <= result.confidence <= 1.0
